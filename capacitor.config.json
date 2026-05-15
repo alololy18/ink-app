@@ -1,0 +1,13 @@
+{
+  "appId": "com.user.ink",
+  "appName": "Ink",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#f5f1e8",
+    "webContentsDebuggingEnabled": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}
