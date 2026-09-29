@@ -79,8 +79,7 @@
   .btn-footer:hover { background: rgba(26, 40, 71, 0.05); }
   .footer-icon { font-size: 14px; color: var(--ink-soft); }
   .backup-status { font-size: 10.5px; color: var(--ink-soft); margin-top: 8px; text-align: center; font-style: italic; min-height: 14px; }
-  .app-version { font-size: 9.5px; color: var(--ink-soft); opacity: 0.55; text-align: center; margin-top: 10px; font-family: ui-monospace, monospace; cursor: pointer; user-select: none; }
-  .app-version:hover { opacity: 1; }
+  .app-version { font-size: 9.5px; color: var(--ink-soft); opacity: 0.55; text-align: center; margin-top: 10px; font-family: ui-monospace, monospace; user-select: none; }
   .empty-state { padding: 30px 20px; text-align: center; color: var(--ink-soft); font-size: 12.5px; font-family: var(--serif); font-style: italic; line-height: 1.5; }
 
   /* WORKSPACE */
@@ -155,6 +154,22 @@
   .habits-view-full-btn:hover { background: rgba(26, 40, 71, 0.05); }
   .habits-empty { padding: 60px 20px; text-align: center; color: var(--ink-soft); }
   .habits-empty-title { font-family: var(--serif); font-style: italic; font-size: 24px; margin-bottom: 8px; color: var(--ink); }
+
+  /* COLLECTION VIEW — a notebook that holds many pages, each shown as an icon */
+  .collection-view { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .collection-view.hidden { display: none; }
+  .collection-grid { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 18px; padding: 24px 36px 40px; align-content: start; }
+  .collection-page-item { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; position: relative; padding: 10px 6px; border-radius: 8px; transition: background 0.15s; }
+  .collection-page-item:hover { background: rgba(26, 40, 71, 0.05); }
+  .collection-page-icon { width: 64px; height: 80px; background: var(--paper); border: 1px solid var(--paper-line); border-radius: 4px; box-shadow: var(--shadow-soft); display: grid; place-items: center; color: var(--ink-faint); }
+  .collection-page-icon svg { width: 28px; height: 28px; }
+  .collection-page-name { font-size: 12px; color: var(--ink); text-align: center; max-width: 108px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .collection-page-item .btn-delete-page { position: absolute; top: 2px; right: 2px; background: var(--paper-deep); border: none; color: var(--ink-soft); cursor: pointer; width: 20px; height: 20px; border-radius: 50%; font-size: 14px; line-height: 1; display: grid; place-items: center; opacity: 0; transition: opacity 0.15s; }
+  .collection-page-item:hover .btn-delete-page { opacity: 0.8; }
+  .collection-page-item .btn-delete-page:hover { opacity: 1; color: var(--danger); }
+  @media (hover: none) { .collection-page-item .btn-delete-page { opacity: 0.55; } }
+  .collection-empty { padding: 80px 40px; text-align: center; color: var(--ink-soft); }
+  .collection-empty-title { font-family: var(--serif); font-style: italic; font-size: 26px; margin-bottom: 8px; }
 
   /* Overview modal (month + year heat map) */
   .overview-modal { max-width: 720px; width: 95%; }
@@ -304,6 +319,7 @@
     .calendar-title { font-size: 32px; }
     .calendar-weekdays { padding: 12px 22px 8px; }
     .calendar-grid { padding: 0 22px 22px; }
+    .collection-grid { padding: 0 22px 22px; }
     .cal-day { min-height: 62px; padding: 8px; }
     .day-num { font-size: 18px; }
     .page-title-display { max-width: 180px; font-size: 15px; }
@@ -336,7 +352,7 @@
       </button>
       <input type="file" id="import-file-input" accept="application/json,.json" style="display:none;" />
       <div class="backup-status" id="backup-status"></div>
-      <div class="app-version" id="app-version" title="Build version — tap to check for updates">v2026-04-23-d</div>
+      <div class="app-version" id="app-version" title="Build version">v0.0.0-dev</div>
     </div>
   </aside>
 
@@ -344,6 +360,9 @@
     <!-- CALENDAR VIEW -->
     <div class="calendar-view" id="calendar-view">
       <div class="calendar-header">
+        <button class="cal-nav-btn" id="btn-sidebar-cal" title="Toggle sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
         <div class="calendar-title-wrap">
           <div class="calendar-notebook-label" id="calendar-nb-label">
             <span class="nb-dot"></span>
@@ -359,9 +378,6 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
           <button class="cal-today-btn" id="btn-today">Today</button>
-          <button class="cal-nav-btn" id="btn-sidebar-cal" title="Toggle sidebar" style="margin-left: 8px;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-          </button>
         </div>
       </div>
       <div class="calendar-weekdays">
@@ -375,6 +391,9 @@
     <!-- HABITS VIEW -->
     <div class="habits-view hidden" id="habits-view">
       <div class="habits-header">
+        <button class="cal-nav-btn" id="btn-sidebar-habits" title="Toggle sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
         <div class="calendar-title-wrap">
           <div class="calendar-notebook-label" id="habits-nb-label">
             <span class="nb-dot"></span>
@@ -386,12 +405,31 @@
           <button class="cal-nav-btn" id="btn-add-habit" title="Add a habit">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
           </button>
-          <button class="cal-nav-btn" id="btn-sidebar-habits" title="Toggle sidebar" style="margin-left: 8px;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-          </button>
         </div>
       </div>
       <div class="habits-scroll" id="habits-scroll"></div>
+    </div>
+
+    <!-- COLLECTION VIEW -->
+    <div class="collection-view hidden" id="collection-view">
+      <div class="calendar-header">
+        <button class="cal-nav-btn" id="btn-sidebar-collection" title="Toggle sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+        <div class="calendar-title-wrap">
+          <div class="calendar-notebook-label" id="collection-nb-label">
+            <span class="nb-dot"></span>
+            <span class="nb-text">No notebook</span>
+          </div>
+          <div class="calendar-title" id="collection-title">Pages</div>
+        </div>
+        <div class="calendar-nav">
+          <button class="cal-nav-btn" id="btn-add-page" title="Add a page">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="collection-grid" id="collection-grid"></div>
     </div>
 
     <!-- WRITING VIEW -->
@@ -463,7 +501,7 @@
     <input class="modal-input" id="modal-input" placeholder="Name your notebook…" maxlength="40" />
 
     <div class="modal-field-label">Type</div>
-    <div class="option-grid cols-3" id="opt-type">
+    <div class="option-grid cols-2" id="opt-type">
       <button class="opt-btn" data-value="calendar">
         <div class="opt-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
@@ -471,11 +509,11 @@
         <div class="opt-label">Calendar</div>
         <div class="opt-sub">One entry per date</div>
       </button>
-      <button class="opt-btn" data-value="simple">
+      <button class="opt-btn" data-value="page">
         <div class="opt-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3h12l4 4v14H4z"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>
         </div>
-        <div class="opt-label">Simple</div>
+        <div class="opt-label">Page</div>
         <div class="opt-sub">One endless page</div>
       </button>
       <button class="opt-btn" data-value="habits">
@@ -484,6 +522,13 @@
         </div>
         <div class="opt-label">Habits</div>
         <div class="opt-sub">Daily check-ins</div>
+      </button>
+      <button class="opt-btn" data-value="collection">
+        <div class="opt-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        </div>
+        <div class="opt-label">Collection</div>
+        <div class="opt-sub">Many pages, as icons</div>
       </button>
     </div>
 
@@ -598,9 +643,7 @@
    native shell. In a browser it's a no-op.
 
    What it does:
-   1. Sets `window.__INK_NATIVE__ = true` so other code can detect native mode
-      and hide things like the "force update" tap (which is irrelevant when
-      there's no service worker / cache).
+   1. Sets `window.__INK_NATIVE__ = true` so other code can detect native mode.
    2. Wires the Android hardware back button to sensible behavior:
         - close open modals first
         - then leave writing view → calendar/habits
@@ -640,111 +683,6 @@
 </script>
 
 <script>
-/* ---- Visible error overlay (debug aid) ----
-   Any uncaught error or unhandled promise rejection becomes a red banner at
-   the top of the page. Invaluable on tablets where devtools isn't easy to open.
-   Tap the banner to dismiss it.
-*/
-(function installErrorOverlay(){
-  const show = (msg) => {
-    const id = '__err_overlay__';
-    let el = document.getElementById(id);
-    if (!el) {
-      el = document.createElement('div');
-      el.id = id;
-      el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#8b1a1a;color:#fff;padding:10px 14px;font:12px/1.4 ui-monospace,monospace;white-space:pre-wrap;max-height:50vh;overflow:auto;border-bottom:2px solid #000;';
-      el.addEventListener('click', () => el.remove());
-      const attach = () => document.body ? document.body.appendChild(el) : setTimeout(attach, 50);
-      attach();
-    }
-    el.textContent = (el.textContent ? el.textContent + '\n\n' : '') + msg + '\n(tap to dismiss)';
-  };
-  window.addEventListener('error', (e) => {
-    show('ERROR: ' + (e.message || e.error || 'unknown') + '\n  at ' + (e.filename || '?') + ':' + (e.lineno || '?') + ':' + (e.colno || '?'));
-  });
-  window.addEventListener('unhandledrejection', (e) => {
-    const r = e.reason || {};
-    show('PROMISE REJECTED: ' + (r.message || r.toString() || 'unknown'));
-  });
-})();
-
-/* ---- Boot diagnostic bar ----
-   Shows runtime state in the top-right corner using inline styles so it
-   survives CSS failures. Tap to dismiss. Auto-hides after 30s.
-*/
-(function installBootDiag(){
-  const el = document.createElement('div');
-  el.id = '__boot_diag__';
-  el.style.cssText = 'position:fixed;top:0;right:0;z-index:99998;background:rgba(0,0,0,0.82);color:#6fffa0;padding:6px 10px;font:10px/1.35 ui-monospace,monospace;border-bottom-left-radius:6px;pointer-events:auto;max-width:82vw;max-height:60vh;overflow:auto;white-space:pre;border-left:2px solid #000;border-bottom:2px solid #000;';
-
-  let lastPenEvent = 'none';
-  let lastPenTs = 0;
-
-  function dims(node) {
-    return node ? `${Math.round(node.clientWidth)}×${Math.round(node.clientHeight)}` : '?';
-  }
-
-  function update() {
-    const w = window.innerWidth, h = window.innerHeight;
-    const orient = w > h ? 'L' : 'P';
-    const appH = document.documentElement.style.getPropertyValue('--app-h') || '(unset)';
-    const appEl = document.getElementById('app');
-    const ws = document.querySelector('.workspace');
-    const cv = document.getElementById('calendar-view');
-    const wv = document.getElementById('writing-view');
-
-    // Access module-scope state defensively (may not be declared yet during boot).
-    let tcount = '?', pActive = '?', tPanStr = '?';
-    try { tcount = activeTouches.size; } catch (_) {}
-    try { pActive = penActive ? 'Y' : 'N'; } catch (_) {}
-    try { tPanStr = touchPan ? 'Y' : 'N'; } catch (_) {}
-
-    const cvHidden = cv ? cv.classList.contains('hidden') : '?';
-    const wvHidden = wv ? wv.classList.contains('hidden') : '?';
-
-    el.textContent = [
-      `ink · ${w}×${h} ${orient} | appH:${appH}`,
-      `app:${dims(appEl)}  ws:${dims(ws)}`,
-      `cal:${dims(cv)} (hid:${cvHidden})  wri:${dims(wv)} (hid:${wvHidden})`,
-      `touches:${tcount}  pan:${tPanStr}  penActive:${pActive}`,
-      `lastPen: ${lastPenEvent}`
-    ].join('\n');
-  }
-
-  // Track pen events globally so we can display their raw properties.
-  window.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'pen') {
-      lastPenEvent = `down btn=${e.button} btns=${e.buttons} p=${(e.pressure||0).toFixed(2)} w=${e.width||0} h=${e.height||0}`;
-      lastPenTs = Date.now();
-      update();
-    } else if (e.pointerType === 'touch') {
-      // also note touch events briefly, helps distinguish palm/finger
-    }
-  }, true);
-  window.addEventListener('pointermove', (e) => {
-    if (e.pointerType === 'pen' && e.buttons !== 0) {
-      // Only log during active strokes to avoid spam from hover
-      if (Date.now() - lastPenTs > 250) {
-        lastPenEvent = `move btn=${e.button} btns=${e.buttons} p=${(e.pressure||0).toFixed(2)}`;
-        lastPenTs = Date.now();
-      }
-    }
-  }, true);
-
-  const attach = () => {
-    if (!document.body) { setTimeout(attach, 50); return; }
-    document.body.appendChild(el);
-  };
-  update();
-  attach();
-  el.addEventListener('click', () => el.remove());
-  window.addEventListener('resize', update);
-  window.addEventListener('orientationchange', update);
-  setInterval(update, 500);
-  // Auto-hide after 30s so it doesn't clutter normal use
-  setTimeout(() => { try { el.remove(); } catch (_) {} }, 30000);
-})();
-
 /* ---- Reliable viewport height (orientation-safe) ----
    `100dvh` is unreliable on some mobile browsers (especially Samsung Internet
    during orientation changes — can report 0, leaving the app invisible). We
@@ -958,7 +896,7 @@ function openDB() {
       if (!db.objectStoreNames.contains('pages')) {
         pagesStore = db.createObjectStore('pages', { keyPath: 'id' });
         pagesStore.createIndex('notebookId', 'notebookId', { unique: false });
-        pagesStore.createIndex('nb_date', ['notebookId', 'dateKey'], { unique: true });
+        pagesStore.createIndex('nb_date', ['notebookId', 'dateKey'], { unique: false });
       } else {
         pagesStore = e.target.transaction.objectStore('pages');
         if (!pagesStore.indexNames.contains('nb_date')) {
@@ -1235,9 +1173,12 @@ async function selectNotebook(id) {
     if (!state.habitsViewMonth) state.habitsViewMonth = new Date();
     renderHabits();
     showView('habits');
-  } else if (nb && nb.type === 'simple') {
-    // simple notebook: open the single page directly
-    await openSimpleNotebookPage();
+  } else if (nb && (nb.type === 'page' || nb.type === 'simple')) {
+    // page notebook ('simple' is the legacy type name): open the single page directly
+    await openSinglePage();
+  } else if (nb && nb.type === 'collection') {
+    await renderCollection();
+    showView('collection');
   } else {
     await loadMonthEntries();
     renderCalendar();
@@ -1367,11 +1308,108 @@ function goToday() {
 $('#btn-prev-month').addEventListener('click', () => changeMonth(-1));
 $('#btn-next-month').addEventListener('click', () => changeMonth(1));
 $('#btn-today').addEventListener('click', goToday);
-$('#btn-sidebar-cal').addEventListener('click', () => {
+function toggleSidebar() {
   const app = $('#app');
   if (window.innerWidth <= 900) app.classList.toggle('sidebar-open');
   else app.classList.toggle('focus-mode');
+}
+['#btn-sidebar-cal', '#btn-sidebar-habits', '#btn-sidebar-collection', '#btn-sidebar-write'].forEach(sel => {
+  $(sel).addEventListener('click', toggleSidebar);
 });
+
+/* ---------- Collection ----------
+   A collection notebook holds many independent pages (no dates, no habits).
+   Pages live in the same `pages` store as everything else, keyed by their
+   own id as the dateKey (guarantees uniqueness per notebook without needing
+   a real date). Each page renders as a small icon in a grid; tapping one
+   opens it for writing, same as any other page.
+*/
+const PAGE_ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3h12l4 4v14H4z"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>';
+
+async function renderCollection() {
+  const nb = currentNotebook();
+  const label = $('#collection-nb-label');
+  if (nb) {
+    label.querySelector('.nb-dot').style.background = nb.color;
+    label.querySelector('.nb-text').textContent = nb.name;
+  }
+  $('#collection-title').textContent = nb ? nb.name : 'Pages';
+
+  const grid = $('#collection-grid');
+  grid.innerHTML = '';
+  if (!nb) return;
+
+  const pages = await DB.allPagesIn(nb.id);
+  pages.sort((a, b) => a.createdAt - b.createdAt);
+
+  if (pages.length === 0) {
+    grid.style.display = 'none';
+    let empty = document.getElementById('collection-empty-state');
+    if (!empty) {
+      empty = document.createElement('div');
+      empty.id = 'collection-empty-state';
+      empty.className = 'collection-empty';
+      empty.innerHTML = '<div class="collection-empty-title">No pages yet</div><div>Tap + to add the first page.</div>';
+      grid.parentElement.appendChild(empty);
+    }
+    empty.style.display = 'block';
+    return;
+  }
+  const empty = document.getElementById('collection-empty-state');
+  if (empty) empty.style.display = 'none';
+  grid.style.display = 'grid';
+
+  pages.forEach(page => {
+    const el = document.createElement('div');
+    el.className = 'collection-page-item';
+    el.innerHTML = `
+      <div class="collection-page-icon">${PAGE_ICON_SVG}</div>
+      <div class="collection-page-name">${escapeHTML(page.title || 'Untitled')}</div>
+      <button class="btn-delete-page" title="Delete page">×</button>
+    `;
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('.btn-delete-page')) return;
+      openPageForEditing(page);
+    });
+    el.querySelector('.btn-delete-page').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const ok = await confirmDialog({
+        title: 'Delete page?',
+        message: `"${page.title || 'Untitled'}" will be permanently deleted. This cannot be undone.`,
+        okLabel: 'Delete'
+      });
+      if (!ok) return;
+      await DB.deletePage(page.id);
+      await loadNotebooks();
+      renderNotebooks();
+      await renderCollection();
+    });
+    grid.appendChild(el);
+  });
+}
+
+async function addCollectionPage() {
+  if (!state.currentNotebookId) return;
+  const nb = currentNotebook();
+  const count = (nb && nb.pageCount) || 0;
+  const name = await promptDialog({ title: 'New page', placeholder: `Page ${count + 1}`, okLabel: 'Add' });
+  const page = {
+    id: uid(),
+    notebookId: state.currentNotebookId,
+    dateKey: uid(), // collections have no dates; the page's own id-derived key just needs to be unique per notebook
+    title: name || `Page ${count + 1}`,
+    createdAt: Date.now(),
+    strokes: [],
+    images: [],
+    docWidth: DOC_INIT_W,
+    docHeight: DOC_INIT_H
+  };
+  await DB.putPage(page);
+  await loadNotebooks();
+  renderNotebooks();
+  openPageForEditing(page);
+}
+$('#btn-add-page').addEventListener('click', addCollectionPage);
 
 /* ---------- Habits ----------
    A habits notebook has a list of `habits` (each with id + name) and an
@@ -1760,19 +1798,16 @@ $$('#overview-modal .overview-tab').forEach(btn => {
 });
 
 $('#btn-add-habit').addEventListener('click', addHabit);
-$('#btn-sidebar-habits').addEventListener('click', () => {
-  const app = $('#app');
-  if (window.innerWidth <= 900) app.classList.toggle('sidebar-open');
-  else app.classList.toggle('focus-mode');
-});
 
 /* ---------- Views ---------- */
 function showView(name) {
   $('#calendar-view').classList.add('hidden');
   $('#habits-view').classList.add('hidden');
+  $('#collection-view').classList.add('hidden');
   $('#writing-view').classList.add('hidden');
   if (name === 'calendar') $('#calendar-view').classList.remove('hidden');
   else if (name === 'habits') $('#habits-view').classList.remove('hidden');
+  else if (name === 'collection') $('#collection-view').classList.remove('hidden');
   else {
     $('#writing-view').classList.remove('hidden');
     requestAnimationFrame(resizeCanvas);
@@ -1803,7 +1838,7 @@ async function openDateEntry(date) {
   openPageForEditing(page);
 }
 
-async function openSimpleNotebookPage() {
+async function openSinglePage() {
   if (!state.currentNotebookId) return;
   const SENTINEL = '_main';
   let page = await DB.getPageByDate(state.currentNotebookId, SENTINEL);
@@ -1857,11 +1892,15 @@ function openPageForEditing(page) {
 function updateBackButton() {
   const nb = currentNotebook();
   const btn = $('#btn-back');
-  // Back button only meaningful for calendar notebooks (return to calendar view).
-  // Hidden for simple notebooks, since they have no intermediate view to return to.
+  // Back button only meaningful for notebooks with an intermediate view to
+  // return to (calendar grid, collection grid). Hidden for page notebooks,
+  // since they open directly with nowhere to go back to.
   if (!nb || nb.type === 'calendar') {
     btn.style.display = '';
     btn.title = 'Back to calendar';
+  } else if (nb.type === 'collection') {
+    btn.style.display = '';
+    btn.title = 'Back to collection';
   } else {
     btn.style.display = 'none';
   }
@@ -1876,13 +1915,13 @@ $('#btn-back').addEventListener('click', async () => {
     renderCalendar();
     state.currentPage = null;
     showView('calendar');
+  } else if (nb.type === 'collection') {
+    await loadNotebooks();
+    renderNotebooks();
+    state.currentPage = null;
+    await renderCollection();
+    showView('collection');
   }
-});
-// Dedicated sidebar toggle — always visible in writing toolbar.
-$('#btn-sidebar-write').addEventListener('click', () => {
-  const app = $('#app');
-  if (window.innerWidth <= 900) app.classList.toggle('sidebar-open');
-  else app.classList.toggle('focus-mode');
 });
 // Tap the dim backdrop to close the sidebar (mobile).
 $('#app').addEventListener('click', (e) => {
@@ -1892,7 +1931,7 @@ $('#app').addEventListener('click', (e) => {
   // Close if the click landed outside the sidebar (i.e. on the backdrop/workspace).
   if (e.target.closest('#sidebar')) return;
   // Don't close if clicking the toggle button (that's handled by the button itself).
-  if (e.target.closest('#btn-sidebar-write') || e.target.closest('#btn-sidebar-cal') || e.target.closest('#btn-sidebar-habits')) return;
+  if (e.target.closest('#btn-sidebar-write') || e.target.closest('#btn-sidebar-cal') || e.target.closest('#btn-sidebar-habits') || e.target.closest('#btn-sidebar-collection')) return;
   app.classList.remove('sidebar-open');
 });
 function updatePageTitle() {
@@ -2126,13 +2165,6 @@ function redrawOverlay() {
     if (img) drawSelectionUI(img);
   }
   ctx.restore();
-}
-
-// Legacy shim: some old callsites still reference redrawInk(). Keep it as an
-// alias that repaints both layers, for code paths that don't distinguish.
-function redrawInk() {
-  redrawCommittedInk();
-  redrawOverlay();
 }
 
 function redrawBg() {
@@ -3249,36 +3281,9 @@ $('#import-file-input').addEventListener('change', async (e) => {
     toast('Import complete');
   } catch (err) {
     console.error(err);
-    toast('Import failed — see error banner');
-    throw err; // surface to the error overlay
+    toast('Import failed — see console for details');
+    throw err;
   }
-});
-
-/* ---------- Version tap → force update ----------
-   Tapping the version number prompts: force the service worker to fetch fresh
-   code from the server. Useful when a redeploy isn't taking effect (installed
-   PWAs hold on to cached HTML). Does NOT touch IndexedDB, so notebook data
-   is preserved.
-*/
-$('#app-version').addEventListener('click', async () => {
-  const ok = await confirmDialog({
-    title: 'Check for updates?',
-    message: 'This reloads the app to fetch the latest code from the server. Your notebooks are not affected.',
-    okLabel: 'Reload'
-  });
-  if (!ok) return;
-  try {
-    if ('serviceWorker' in navigator) {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      for (const r of regs) await r.unregister();
-    }
-    if ('caches' in window) {
-      const names = await caches.keys();
-      for (const n of names) await caches.delete(n);
-    }
-  } catch (err) { console.warn('Cache clear failed', err); }
-  // Hard reload bypassing cache
-  window.location.reload();
 });
 
 /* ---------- Keyboard ---------- */
