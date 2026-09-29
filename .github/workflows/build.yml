@@ -26,6 +26,11 @@ jobs:
       - name: Install Capacitor dependencies
         run: npm install
 
+      - name: Stamp build version
+        run: |
+          STAMP="v$(date -u +%Y-%m-%d)-$(git rev-parse --short HEAD)"
+          sed -i "s/v0\.0\.0-dev/$STAMP/" www/index.html
+
       - name: Add Android platform (first run only)
         run: |
           if [ ! -d "android" ]; then
