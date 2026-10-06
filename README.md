@@ -85,7 +85,7 @@ The `android/` folder doesn't exist until the first build runs. After it's gener
 
 **APK installs but won't open.** Long-press the icon → App info → Storage → Clear data, then reopen.
 
-**Updated APK won't replace old one.** Both must be signed with the same key. For debug-signed APKs from this CI, this is automatic. If you ever switch to release-signed builds, you'll need to keep the keystore consistent.
+**Updated APK won't replace old one.** Both must be signed with the same key. Each GitHub build runs on a fresh machine, so the build uses the fixed key stored in the repo secret `DEBUG_KEYSTORE_BASE64` (Settings → Secrets and variables → Actions). If that secret is missing the build stops with an error. If it is ever replaced, the next APK will need one uninstall (export a backup first).
 
 **Lost data after reinstalling.** "Uninstall" (long-press → uninstall) deletes the app's private storage. "Replace via newer APK" doesn't. So always update via APK; only uninstall when you mean it.
 
