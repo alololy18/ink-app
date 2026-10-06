@@ -42,6 +42,23 @@ jobs:
             npx cap add android
           fi
 
+      # Every GitHub build machine is brand new, so without this Gradle invents a
+      # new random signing key each time and Android refuses to update the app.
+      # The key lives in the repo secret DEBUG_KEYSTORE_BASE64 (never in the code).
+      - name: Use the same signing key every build
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$DEBUG_KEYSTORE_BASE64" ]; then
+            echo "::error::Repo secret DEBUG_KEYSTORE_BASE64 is missing. See README > Signing key."
+            exit 1
+          fi
+          KEYDIR="${ANDROID_USER_HOME:-$HOME/.android}"
+          mkdir -p "$KEYDIR"
+          echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > "$KEYDIR/debug.keystore"
+          # Fingerprint is public info; it must be identical in every build log.
+          keytool -list -v -keystore "$KEYDIR/debug.keystore" -storepass android | grep SHA256:
+
       - name: Sync www/ into the Android project
         run: npx cap sync android
 
