@@ -23,6 +23,11 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Check www/index.html for errors
+        run: |
+          node test/check-syntax.js
+          node test/reminders.test.js
+
       - name: Install Capacitor dependencies
         run: npm install
 
