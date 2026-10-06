@@ -976,19 +976,27 @@ const DB = {
 const BACKUP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const BACKUP_TS_KEY = 'ink.lastBackupTime';
 
-function downloadJSON(filename, data) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  // Give the browser a moment to start the download before revoking the URL
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+async function downloadJSON(filename, data) {
+  const json = JSON.stringify(data, null, 2);
+
+  // On native Android, write to Downloads via Capacitor Filesystem.
+  if (window.__INK_NATIVE__) {
+    try {
+      const FS = window.Capacitor.Plugins.Filesystem;
+      // Documents directory maps to Downloads on most Android devices.
+      await FS.writeFile({
+        path: filename,
+        data: json,
+        directory: 'Documents',
+        recursive: true
+      });
+      toast(`Backup saved to Downloads: ${filename}`);
+      return;
+    } catch (err) {
+      console.error('Backup to Downloads failed:', err);
+      toast('Could not save to Downloads — try importing instead');
+    }
+  }
 
 function safeName(s) {
   return String(s).replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'notebook';
@@ -1012,7 +1020,7 @@ async function exportNotebook(nb) {
     pages: pages
   };
   const fname = `ink-${safeName(nb.name)}-${dateStamp()}.json`;
-  downloadJSON(fname, payload);
+  await downloadJSON(fname, payload);
 }
 
 async function exportAllNotebooks() {
@@ -1029,7 +1037,7 @@ async function exportAllNotebooks() {
     notebooks: notebooks
   };
   const fname = `ink-backup-${dateStamp()}.json`;
-  downloadJSON(fname, payload);
+  await downloadJSON(fname, payload);
   // Record the timestamp so auto-backup spacing works.
   try { localStorage.setItem(BACKUP_TS_KEY, String(Date.now())); } catch (_) {}
   updateBackupStatus();
