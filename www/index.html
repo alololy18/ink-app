@@ -811,10 +811,11 @@ function confirmDialog({ title = 'Confirm', message = '', okLabel = 'Delete' } =
 // Promise-based prompt dialog for text input.
 // Usage: const name = await promptDialog({ title, placeholder, initial, okLabel });
 // Returns the trimmed string, or null if cancelled.
-function promptDialog({ title = 'Input', placeholder = '', initial = '', okLabel = 'OK' } = {}) {
+function promptDialog({ title = 'Input', placeholder = '', initial = '', okLabel = 'OK', type = 'text' } = {}) {
   return new Promise((resolve) => {
     const bg = $('#prompt-modal');
     const input = $('#prompt-input');
+    input.type = type;
     $('#prompt-title').textContent = title;
     input.placeholder = placeholder;
     input.value = initial;
@@ -1131,6 +1132,7 @@ function renderNotebooks() {
       }
       await loadNotebooks();
       renderNotebooks();
+      if (nb.type === 'habits') syncReminders();
       if (!state.currentNotebookId && state.notebooks.length > 0) {
         selectNotebook(state.notebooks[0].id);
       } else {
@@ -1431,6 +1433,94 @@ function setHabitState(nb, habitId, dk, st) {
   const key = habitId + ':' + dk;
   if (!st) delete nb.entries[key]; else nb.entries[key] = st;
 }
+
+/* ---------- Habit reminders (Android only) ----------
+   A habit may carry `reminder: "HH:MM"`. Each one becomes a daily local
+   notification with Done / Missed buttons that write straight into
+   nb.entries. The OS owns the schedule (survives reboots), so we only
+   re-sync when reminder data changes: set/remove/rename/delete, notebook
+   delete, backup import.
+*/
+/* reminders-pure:start */
+// Stable 31-bit positive int from the habit id (Android notification ids are Java ints).
+function reminderNotifId(habitId) {
+  let h = 0;
+  for (const c of habitId) h = (h * 31 + c.charCodeAt(0)) | 0;
+  return (h & 0x7fffffff) || 1;
+}
+// Day the reminder belongs to = date of its most recent firing. So answering a
+// 22:00 reminder at 00:30 still marks yesterday, not today.
+function reminderDayKey(hhmm, now = new Date()) {
+  const [h, m] = hhmm.split(':').map(Number);
+  const d = new Date(now);
+  d.setHours(h, m, 0, 0);
+  if (d > now) d.setDate(d.getDate() - 1);
+  return dateKey(d);
+}
+/* reminders-pure:end */
+
+function nativeNotifications() {
+  return (window.__INK_NATIVE__ && window.Capacitor.Plugins.LocalNotifications) || null;
+}
+
+// Cancel everything we scheduled and reschedule from current data.
+// ponytail: full resync is O(habits) per change; fine for tens of habits.
+async function syncReminders() {
+  const LN = nativeNotifications();
+  if (!LN) return;
+  try {
+    const { notifications: pending } = await LN.getPending();
+    if (pending.length) await LN.cancel({ notifications: pending.map(n => ({ id: n.id })) });
+    const list = [];
+    for (const nb of state.notebooks) {
+      if (nb.type !== 'habits') continue;
+      for (const h of nb.habits || []) {
+        if (!h.reminder) continue;
+        const [hour, minute] = h.reminder.split(':').map(Number);
+        list.push({
+          id: reminderNotifId(h.id),
+          title: h.name,
+          body: `${nb.name} · Did you do it today?`,
+          actionTypeId: 'HABIT_CHECKIN',
+          extra: { notebookId: nb.id, habitId: h.id },
+          // ponytail: Android 12+ may deliver a few minutes late without the exact-alarm permission.
+          schedule: { on: { hour, minute }, allowWhileIdle: true }
+        });
+      }
+    }
+    if (list.length) await LN.schedule({ notifications: list });
+  } catch (err) {
+    console.error(err);
+    toast('Could not schedule reminders');
+  }
+}
+
+async function setupReminders() {
+  const LN = nativeNotifications();
+  if (!LN) return;
+  await LN.registerActionTypes({ types: [{
+    id: 'HABIT_CHECKIN',
+    actions: [{ id: 'done', title: '✓ Done' }, { id: 'missed', title: '✗ Missed' }]
+  }] });
+  // Capacitor retains this event until a listener exists, so a button pressed
+  // while the app was closed is still delivered here after launch.
+  LN.addListener('localNotificationActionPerformed', async ({ actionId, notification }) => {
+    const { notebookId, habitId } = notification.extra || {};
+    const nb = state.notebooks.find(n => n.id === notebookId);
+    const habit = nb && (nb.habits || []).find(h => h.id === habitId);
+    if (!habit) return;
+    if (actionId === 'done' || actionId === 'missed') {
+      const dk = habit.reminder ? reminderDayKey(habit.reminder) : dateKey(new Date());
+      setHabitState(nb, habitId, dk, actionId);
+      await DB.putNotebook(nb);
+      LN.removeDeliveredNotifications({ notifications: [notification] }).catch(() => {});
+      toast(`${habit.name}: ${actionId}`);
+    }
+    if (state.currentNotebookId !== nb.id) await selectNotebook(nb.id);
+    else renderHabits();
+  });
+}
+
 function computeStreak(nb, habitId) {
   // Current streak = consecutive 'done' days ending today (or yesterday if today blank).
   let streak = 0;
@@ -1521,6 +1611,13 @@ function renderHabits() {
     name.textContent = habit.name;
     top.appendChild(name);
 
+    if (habit.reminder) {
+      const rem = document.createElement('div');
+      rem.className = 'habit-card-streak';
+      rem.textContent = `⏰ ${habit.reminder}`;
+      top.appendChild(rem);
+    }
+
     if (streak > 0) {
       const streakEl = document.createElement('div');
       streakEl.className = 'habit-card-streak' + (streak >= 7 ? ' hot' : '');
@@ -1530,7 +1627,7 @@ function renderHabits() {
 
     const menu = document.createElement('button');
     menu.className = 'habit-card-menu';
-    menu.title = 'Rename or delete';
+    menu.title = 'Rename, reminder or delete';
     menu.textContent = '⋯';
     menu.addEventListener('click', (e) => { e.stopPropagation(); openHabitMenu(habit); });
     top.appendChild(menu);
@@ -1603,13 +1700,13 @@ async function addHabit() {
 }
 
 async function openHabitMenu(habit) {
-  const action = await actionDialog({
-    title: habit.name,
-    actions: [
-      { label: 'Rename', value: 'rename' },
-      { label: 'Delete', value: 'delete', destructive: true }
-    ]
-  });
+  const actions = [
+    { label: 'Rename', value: 'rename' },
+    { label: habit.reminder ? `Reminder: ${habit.reminder} (change)` : 'Set daily reminder', value: 'reminder' }
+  ];
+  if (habit.reminder) actions.push({ label: 'Remove reminder', value: 'unremind' });
+  actions.push({ label: 'Delete', value: 'delete', destructive: true });
+  const action = await actionDialog({ title: habit.name, actions });
   if (action === 'rename') {
     const newName = await promptDialog({ title: 'Rename habit', initial: habit.name, okLabel: 'Save' });
     if (newName && newName.trim()) {
@@ -1617,7 +1714,28 @@ async function openHabitMenu(habit) {
       const nb = state.notebooks.find(n => n.id === state.currentNotebookId);
       await DB.putNotebook(nb);
       renderHabits();
+      if (habit.reminder) syncReminders(); // notification title = habit name
     }
+  } else if (action === 'reminder') {
+    const LN = nativeNotifications();
+    if (!LN) { toast('Reminders work in the Android app only'); return; }
+    const t = await promptDialog({ title: `Remind me daily at`, initial: habit.reminder || '09:00', okLabel: 'Save', type: 'time' });
+    if (!t || !/^([01]\d|2[0-3]):[0-5]\d$/.test(t)) return;
+    const perm = await LN.requestPermissions().catch(() => ({}));
+    if (perm.display !== 'granted') toast('Allow notifications for Ink in Android settings');
+    habit.reminder = t;
+    const nb = state.notebooks.find(n => n.id === state.currentNotebookId);
+    await DB.putNotebook(nb);
+    await syncReminders();
+    renderHabits();
+    if (perm.display === 'granted') toast(`Reminder set for ${t} daily`);
+  } else if (action === 'unremind') {
+    delete habit.reminder;
+    const nb = state.notebooks.find(n => n.id === state.currentNotebookId);
+    await DB.putNotebook(nb);
+    await syncReminders();
+    renderHabits();
+    toast('Reminder removed');
   } else if (action === 'delete') {
     const ok = await confirmDialog({
       title: 'Delete habit?',
@@ -1636,6 +1754,7 @@ async function openHabitMenu(habit) {
     await DB.putNotebook(nb);
     renderHabits();
     renderNotebooks();
+    if (habit.reminder) syncReminders();
   }
 }
 
@@ -3275,6 +3394,7 @@ $('#import-file-input').addEventListener('change', async (e) => {
     }
     await loadNotebooks();
     renderNotebooks();
+    await syncReminders(); // imported habits may carry reminders
     if (state.notebooks.length > 0) {
       await selectNotebook(state.notebooks[state.notebooks.length - 1].id);
     }
@@ -3319,6 +3439,8 @@ async function init() {
   } else {
     renderCalendar();
   }
+  // After notebooks load, so a Done/Missed tap that launched the app can be applied.
+  setupReminders().catch(err => console.error(err));
 
   function scheduleCanvasResize(delay) {
     clearTimeout(init._r);
