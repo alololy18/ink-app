@@ -976,29 +976,29 @@ const DB = {
 const BACKUP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const BACKUP_TS_KEY = 'ink.lastBackupTime';
 
+// Saves the backup and returns where it went (for the toast). Throws on
+// failure so callers never show "backed up" / record a backup time for a
+// file that was never written.
 async function downloadJSON(filename, data) {
   const json = JSON.stringify(data, null, 2);
 
-  // On native Android, write to Downloads via Capacitor Filesystem.
+  // Android app: the WebView can't do <a download>, so write the file directly
+  // into the public Documents folder. It survives uninstalling the app.
+  // ponytail: Android 10 and older also need WRITE_EXTERNAL_STORAGE in the manifest; not added.
   if (window.__INK_NATIVE__) {
-    try {
-      const FS = window.Capacitor.Plugins.Filesystem;
-      // Documents directory maps to Downloads on most Android devices.
-      await FS.writeFile({
-        path: filename,
-        data: json,
-        directory: 'Documents',
-        recursive: true
-      });
-      toast(`Backup saved to Downloads: ${filename}`);
-      return;
-    } catch (err) {
-      console.error('Backup to Downloads failed:', err);
-      toast('Could not save to Downloads — try importing instead');
-    }
+    const FS = window.Capacitor.Plugins.Filesystem;
+    if (!FS) throw new Error('Filesystem plugin missing from this build');
+    await FS.writeFile({
+      path: 'Ink/' + filename,
+      data: json,
+      directory: 'DOCUMENTS', // Capacitor's Directory.Documents value
+      encoding: 'utf8',       // without this the plugin treats data as base64
+      recursive: true
+    });
+    return 'Documents/Ink';
   }
 
-  // Browser fallback (web version, or native fallback).
+  // Browser (web version): normal download.
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1009,6 +1009,7 @@ async function downloadJSON(filename, data) {
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return 'Downloads';
 }
 
 function safeName(s) {
@@ -1033,7 +1034,7 @@ async function exportNotebook(nb) {
     pages: pages
   };
   const fname = `ink-${safeName(nb.name)}-${dateStamp()}.json`;
-  await downloadJSON(fname, payload);
+  return downloadJSON(fname, payload);
 }
 
 async function exportAllNotebooks() {
@@ -1050,10 +1051,11 @@ async function exportAllNotebooks() {
     notebooks: notebooks
   };
   const fname = `ink-backup-${dateStamp()}.json`;
-  await downloadJSON(fname, payload);
+  const where = await downloadJSON(fname, payload);
   // Record the timestamp so auto-backup spacing works.
   try { localStorage.setItem(BACKUP_TS_KEY, String(Date.now())); } catch (_) {}
   updateBackupStatus();
+  return where;
 }
 
 function updateBackupStatus() {
@@ -1091,8 +1093,8 @@ async function maybeAutoBackup() {
   const age = Date.now() - ts;
   if (age >= BACKUP_INTERVAL_MS) {
     try {
-      await exportAllNotebooks();
-      toast('Weekly backup downloaded');
+      const where = await exportAllNotebooks();
+      toast(`Weekly backup saved to ${where}`);
     } catch (err) {
       console.error('Auto-backup failed', err);
       toast('Auto-backup failed — try manually');
@@ -1129,8 +1131,8 @@ function renderNotebooks() {
     el.querySelector('.btn-export').addEventListener('click', async (e) => {
       e.stopPropagation();
       try {
-        await exportNotebook(nb);
-        toast(`"${nb.name}" exported`);
+        const where = await exportNotebook(nb);
+        toast(`"${nb.name}" saved to ${where}`);
       } catch (err) {
         toast('Export failed');
         console.error(err);
@@ -3341,8 +3343,8 @@ $('#btn-export-all').addEventListener('click', async () => {
     return;
   }
   try {
-    await exportAllNotebooks();
-    toast('Backup downloaded');
+    const where = await exportAllNotebooks();
+    toast(`Backup saved to ${where}`);
   } catch (err) {
     console.error(err);
     toast('Export failed');
